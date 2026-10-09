@@ -1,0 +1,6 @@
+{
+  "name": "AgroStream Premier - Consultations, Seedlings & Event Live-Streaming",
+  "description": "Unified platform for professional appointment bookings, agricultural seedling commerce, and event live-streaming with Paystack split payments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

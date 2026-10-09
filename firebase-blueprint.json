@@ -1,0 +1,321 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized administrator user profile",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "description": "Administrator email" },
+        "role": { "type": "string", "enum": ["superadmin", "admin"], "description": "Admin access role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["email", "role"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Appointment and consultation service definition",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150, "description": "Service name" },
+        "description": { "type": "string", "maxLength": 2000, "description": "Service details and scope" },
+        "imageUrl": { "type": "string", "description": "Display image URL" },
+        "price": { "type": "number", "description": "Service fee in NGN" },
+        "durationMinutes": { "type": "number", "description": "Duration in minutes" },
+        "availableDays": { "type": "string", "description": "Comma separated days of the week" },
+        "timeSlots": { "type": "string", "description": "Comma separated slot times" },
+        "bookingInstructions": { "type": "string", "description": "Customer guidance for consultation" },
+        "cancellationPolicy": { "type": "string", "description": "Cancellation and rescheduling policy" },
+        "active": { "type": "boolean", "description": "Service availability status" },
+        "createdAt": { "type": "string", "description": "Created date" }
+      },
+      "required": ["name", "price", "active"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Customer consultation booking record",
+      "type": "object",
+      "properties": {
+        "serviceId": { "type": "string", "description": "Booked service identifier" },
+        "serviceName": { "type": "string", "description": "Booked service name" },
+        "customerName": { "type": "string", "maxLength": 120, "description": "Customer full name" },
+        "customerPhone": { "type": "string", "maxLength": 30, "description": "Customer phone number" },
+        "customerEmail": { "type": "string", "maxLength": 120, "description": "Customer email address" },
+        "date": { "type": "string", "description": "Appointment date YYYY-MM-DD" },
+        "time": { "type": "string", "description": "Appointment slot time" },
+        "notes": { "type": "string", "maxLength": 1000, "description": "Optional customer notes" },
+        "price": { "type": "number", "description": "Business price in NGN" },
+        "platformFee": { "type": "number", "description": "Fixed 60 NGN platform fee" },
+        "totalAmount": { "type": "number", "description": "Total amount paid in NGN" },
+        "paymentReference": { "type": "string", "description": "Internal payment reference" },
+        "paystackReference": { "type": "string", "description": "Paystack verification reference" },
+        "status": { "type": "string", "enum": ["pending_payment", "confirmed", "rescheduled", "cancelled", "completed"], "description": "Booking status" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Update timestamp" }
+      },
+      "required": ["serviceId", "customerName", "customerPhone", "date", "time", "status"]
+    },
+    "Seminar": {
+      "title": "Seminar",
+      "description": "Educational seminar and training event",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200, "description": "Seminar topic/title" },
+        "description": { "type": "string", "maxLength": 3000, "description": "Curriculum and details" },
+        "imageUrl": { "type": "string", "description": "Banner image URL" },
+        "registrationPrice": { "type": "number", "description": "Registration fee in NGN" },
+        "date": { "type": "string", "description": "Event date" },
+        "time": { "type": "string", "description": "Event start time" },
+        "venue": { "type": "string", "description": "Physical venue or online link info" },
+        "isOnline": { "type": "boolean", "description": "Whether attendance is virtual" },
+        "registrationDeadline": { "type": "string", "description": "Deadline timestamp or date" },
+        "capacity": { "type": "number", "description": "Maximum participant seats" },
+        "registeredCount": { "type": "number", "description": "Currently confirmed registrations" },
+        "status": { "type": "string", "enum": ["upcoming", "cancelled", "completed"], "description": "Event lifecycle status" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["title", "registrationPrice", "date", "capacity", "status"]
+    },
+    "SeminarRegistration": {
+      "title": "SeminarRegistration",
+      "description": "Participant seminar registration ticket",
+      "type": "object",
+      "properties": {
+        "seminarId": { "type": "string", "description": "Target seminar ID" },
+        "seminarTitle": { "type": "string", "description": "Target seminar title" },
+        "customerName": { "type": "string", "maxLength": 120, "description": "Participant name" },
+        "customerPhone": { "type": "string", "maxLength": 30, "description": "Participant phone" },
+        "customerEmail": { "type": "string", "maxLength": 120, "description": "Participant email" },
+        "price": { "type": "number", "description": "Registration price in NGN" },
+        "platformFee": { "type": "number", "description": "Fixed 60 NGN platform fee" },
+        "totalAmount": { "type": "number", "description": "Total amount in NGN" },
+        "paymentReference": { "type": "string", "description": "Internal payment reference" },
+        "paystackReference": { "type": "string", "description": "Paystack reference" },
+        "status": { "type": "string", "enum": ["pending_payment", "confirmed", "cancelled"], "description": "Ticket status" },
+        "registeredAt": { "type": "string", "description": "Registration timestamp" }
+      },
+      "required": ["seminarId", "customerName", "customerPhone", "status"]
+    },
+    "ProductCategory": {
+      "title": "ProductCategory",
+      "description": "Category for agricultural products and seedlings",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100, "description": "Category display name" },
+        "description": { "type": "string", "maxLength": 500, "description": "Description" },
+        "slug": { "type": "string", "description": "URL slug" }
+      },
+      "required": ["name", "slug"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Agricultural seedlings or farming inputs item",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150, "description": "Seedling or product name" },
+        "description": { "type": "string", "maxLength": 3000, "description": "Botanical details and growing advice" },
+        "imageUrls": { "type": "string", "description": "Image URLs" },
+        "categoryId": { "type": "string", "description": "Parent category ID" },
+        "categoryName": { "type": "string", "description": "Category display title" },
+        "price": { "type": "number", "description": "Price per unit in NGN" },
+        "unitOfSale": { "type": "string", "description": "e.g., seedling, bundle of 10, bag" },
+        "stock": { "type": "number", "description": "Available stock quantity" },
+        "minOrderQuantity": { "type": "number", "description": "Minimum purchase quantity" },
+        "maxOrderQuantity": { "type": "number", "description": "Maximum purchase quantity" },
+        "active": { "type": "boolean", "description": "Whether visible and purchasable" },
+        "isFeatured": { "type": "boolean", "description": "Display in homepage featured section" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["name", "price", "unitOfSale", "stock", "active"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer purchase of agricultural products",
+      "type": "object",
+      "properties": {
+        "orderReference": { "type": "string", "maxLength": 50, "description": "Unique reference e.g. ORD-123456" },
+        "customerName": { "type": "string", "maxLength": 120, "description": "Customer name" },
+        "customerPhone": { "type": "string", "maxLength": 30, "description": "Customer phone" },
+        "customerEmail": { "type": "string", "maxLength": 120, "description": "Customer email" },
+        "items": { "type": "string", "description": "JSON string of purchased order line items" },
+        "subtotal": { "type": "number", "description": "Products subtotal in NGN" },
+        "platformFee": { "type": "number", "description": "Fixed 60 NGN platform fee" },
+        "totalAmount": { "type": "number", "description": "Total amount paid in NGN" },
+        "paymentReference": { "type": "string", "description": "Internal transaction reference" },
+        "paystackReference": { "type": "string", "description": "Paystack reference" },
+        "status": { "type": "string", "enum": ["pending_payment", "paid", "cancelled", "refunded"], "description": "Payment status" },
+        "fulfilmentStatus": { "type": "string", "enum": ["awaiting_fulfilment", "ready_for_collection", "collected"], "description": "Collection status" },
+        "collectionNotes": { "type": "string", "maxLength": 500, "description": "Collection address instructions" },
+        "createdAt": { "type": "string", "description": "Order creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last status update timestamp" }
+      },
+      "required": ["orderReference", "customerName", "customerPhone", "subtotal", "totalAmount", "status", "fulfilmentStatus"]
+    },
+    "LiveStreamBooking": {
+      "title": "LiveStreamBooking",
+      "description": "Event live-streaming booking and quotation record",
+      "type": "object",
+      "properties": {
+        "enquiryReference": { "type": "string", "maxLength": 50, "description": "Unique reference e.g. LIV-123456" },
+        "customerName": { "type": "string", "maxLength": 120, "description": "Customer name" },
+        "customerPhone": { "type": "string", "maxLength": 30, "description": "Customer phone" },
+        "customerEmail": { "type": "string", "maxLength": 120, "description": "Customer email" },
+        "eventType": { "type": "string", "maxLength": 100, "description": "Wedding, funeral, conference, naming, etc." },
+        "eventDate": { "type": "string", "description": "Event date" },
+        "startTime": { "type": "string", "description": "Start time" },
+        "location": { "type": "string", "maxLength": 300, "description": "Physical event venue" },
+        "durationHours": { "type": "number", "description": "Expected streaming duration" },
+        "audienceSize": { "type": "string", "maxLength": 100, "description": "Estimated attendee volume" },
+        "preferredPlatform": { "type": "string", "maxLength": 150, "description": "YouTube, Facebook, Zoom, Custom RTMP" },
+        "technicalRequirements": { "type": "string", "maxLength": 1500, "description": "Multi-camera, drones, wireless audio, etc." },
+        "notes": { "type": "string", "maxLength": 1500, "description": "Additional event notes" },
+        "pricingType": { "type": "string", "enum": ["fixed", "custom_quote"], "description": "Pricing category" },
+        "quotedPrice": { "type": "number", "description": "Service charge in NGN" },
+        "platformFee": { "type": "number", "description": "Fixed 60 NGN platform fee" },
+        "totalAmount": { "type": "number", "description": "Total payable in NGN" },
+        "quoteStatus": { "type": "string", "enum": ["pending_review", "quoted", "accepted", "declined", "withdrawn", "expired"], "description": "Quotation lifecycle" },
+        "paymentStatus": { "type": "string", "enum": ["unpaid", "paid", "refunded"], "description": "Payment status" },
+        "quoteConditions": { "type": "string", "maxLength": 1500, "description": "Terms or conditions of the quotation" },
+        "quoteExpiresAt": { "type": "string", "description": "Quote valid deadline" },
+        "paymentReference": { "type": "string", "description": "Internal payment reference" },
+        "paystackReference": { "type": "string", "description": "Paystack verification reference" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Update timestamp" }
+      },
+      "required": ["enquiryReference", "customerName", "customerPhone", "eventType", "eventDate", "pricingType"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Financial transaction audit record",
+      "type": "object",
+      "properties": {
+        "internalReference": { "type": "string", "description": "Internal generated payment code" },
+        "paystackReference": { "type": "string", "description": "Paystack transaction reference" },
+        "category": { "type": "string", "enum": ["appointment", "seminar", "agricultural_order", "livestream"], "description": "Transaction type" },
+        "relatedId": { "type": "string", "description": "Target booking or order ID" },
+        "customerName": { "type": "string", "description": "Payer name" },
+        "customerPhone": { "type": "string", "description": "Payer phone" },
+        "customerEmail": { "type": "string", "description": "Payer email" },
+        "businessAmount": { "type": "number", "description": "Business share in NGN" },
+        "platformFee": { "type": "number", "description": "Platform fee in NGN (60)" },
+        "totalAmountCharged": { "type": "number", "description": "Total charged in NGN" },
+        "currency": { "type": "string", "description": "NGN" },
+        "status": { "type": "string", "enum": ["pending", "verified", "failed", "refunded"], "description": "Payment verification state" },
+        "splitConfig": { "type": "string", "description": "JSON representation of Paystack split payload" },
+        "verifiedAt": { "type": "string", "description": "Verification timestamp" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["internalReference", "category", "businessAmount", "platformFee", "totalAmountCharged", "status"]
+    },
+    "Refund": {
+      "title": "Refund",
+      "description": "Transaction cancellation and refund management",
+      "type": "object",
+      "properties": {
+        "paymentReference": { "type": "string", "description": "Target transaction reference" },
+        "relatedId": { "type": "string", "description": "Related order or booking reference" },
+        "category": { "type": "string", "description": "Transaction category" },
+        "customerName": { "type": "string", "description": "Customer name" },
+        "customerPhone": { "type": "string", "description": "Customer phone" },
+        "amount": { "type": "number", "description": "Refund amount in NGN" },
+        "reason": { "type": "string", "maxLength": 500, "description": "Refund justification" },
+        "status": { "type": "string", "enum": ["pending", "approved", "processed", "rejected"], "description": "Refund lifecycle" },
+        "platformFeeRefunded": { "type": "boolean", "description": "Whether 60 NGN platform fee was refunded" },
+        "requestedAt": { "type": "string", "description": "Request timestamp" },
+        "processedAt": { "type": "string", "description": "Processing timestamp" }
+      },
+      "required": ["paymentReference", "amount", "status"]
+    },
+    "NotificationLog": {
+      "title": "NotificationLog",
+      "description": "SMS and Email transactional notification record",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "description": "Notification category" },
+        "recipientPhone": { "type": "string", "description": "Recipient phone number" },
+        "recipientEmail": { "type": "string", "description": "Recipient email" },
+        "relatedReference": { "type": "string", "description": "Related booking or order reference" },
+        "channel": { "type": "string", "enum": ["sms", "email", "both"], "description": "Transmission channel" },
+        "status": { "type": "string", "enum": ["queued", "sent", "failed", "unconfigured"], "description": "Delivery status" },
+        "message": { "type": "string", "maxLength": 2000, "description": "Rendered message content" },
+        "providerReference": { "type": "string", "description": "Provider tracking message ID" },
+        "attemptCount": { "type": "number", "description": "Delivery attempts count" },
+        "error": { "type": "string", "description": "Error details if failed" },
+        "createdAt": { "type": "string", "description": "Dispatch timestamp" }
+      },
+      "required": ["type", "channel", "status"]
+    },
+    "BusinessSetting": {
+      "title": "BusinessSetting",
+      "description": "Configurable business website settings",
+      "type": "object",
+      "properties": {
+        "businessName": { "type": "string", "description": "Configurable business name" },
+        "businessPhone": { "type": "string", "description": "Phone number" },
+        "businessEmail": { "type": "string", "description": "Contact email" },
+        "businessAddress": { "type": "string", "description": "Office address" },
+        "collectionAddress": { "type": "string", "description": "Seedling and product pickup address" },
+        "websiteDomain": { "type": "string", "description": "Domain name" },
+        "logoUrl": { "type": "string", "description": "Logo URL" },
+        "platformFeeNgn": { "type": "number", "description": "Platform fee in NGN (60)" },
+        "paystackSubaccount": { "type": "string", "description": "Paystack subaccount code" },
+        "appointmentCancellationHours": { "type": "number", "description": "Hours notice required for rescheduling" },
+        "platformFeeRefundable": { "type": "boolean", "description": "Configurable policy on platform fee refundability" }
+      },
+      "required": ["businessName", "businessPhone", "businessEmail"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Administrator profiles with verified role"
+    },
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/Service" },
+      "description": "Consultation and appointment services"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Booked appointments and consultations"
+    },
+    "/seminars/{seminarId}": {
+      "schema": { "$ref": "#/entities/Seminar" },
+      "description": "Educational training and agricultural seminars"
+    },
+    "/seminarRegistrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/SeminarRegistration" },
+      "description": "Confirmed seminar registrations and tickets"
+    },
+    "/productCategories/{categoryId}": {
+      "schema": { "$ref": "#/entities/ProductCategory" },
+      "description": "Categories for seedlings and agricultural products"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Seedlings and agricultural inventory catalog"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer purchase orders for seedlings and products"
+    },
+    "/livestreamBookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/LiveStreamBooking" },
+      "description": "Event live-streaming bookings, enquiries, and custom quotes"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Verified payments and audit records"
+    },
+    "/refunds/{refundId}": {
+      "schema": { "$ref": "#/entities/Refund" },
+      "description": "Processed refunds and cancellation tracking"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/NotificationLog" },
+      "description": "Audit trail of SMS and transactional emails"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/BusinessSetting" },
+      "description": "System and business configuration settings"
+    }
+  }
+}

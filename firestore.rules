@@ -1,0 +1,226 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened primitive definitions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (isVerifiedUser() && request.auth.token.email == 'johncoleexpert@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isAdmin();
+      allow list: if isAdmin();
+      allow create, update, delete: if isValidId(adminId) && isAdmin();
+    }
+
+    // Services Collection
+    function isValidService(data) {
+      return data.keys().hasAll(['name', 'price', 'active'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 150
+        && data.price is number && data.price >= 0
+        && data.active is bool;
+    }
+
+    match /services/{serviceId} {
+      allow get: if isValidId(serviceId);
+      allow list: if true;
+      allow create: if isValidId(serviceId) && isAdmin() && isValidService(incoming());
+      allow update: if isValidId(serviceId) && isAdmin() && isValidService(incoming());
+      allow delete: if isValidId(serviceId) && isAdmin();
+    }
+
+    // Appointments Collection
+    function isValidAppointment(data) {
+      return data.keys().hasAll(['serviceId', 'customerName', 'customerPhone', 'date', 'time', 'status'])
+        && data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 120
+        && data.customerPhone is string && data.customerPhone.size() > 0 && data.customerPhone.size() <= 30
+        && data.date is string && data.date.size() > 0 && data.date.size() <= 20
+        && data.time is string && data.time.size() > 0 && data.time.size() <= 20
+        && data.status is string && data.status.size() <= 30;
+    }
+
+    match /appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(appointmentId) && isValidAppointment(incoming())
+        && (incoming().status == 'pending_payment' || isAdmin());
+      allow update: if isValidId(appointmentId) && isAdmin() && isValidAppointment(incoming());
+      allow delete: if isValidId(appointmentId) && isAdmin();
+    }
+
+    // Seminars Collection
+    function isValidSeminar(data) {
+      return data.keys().hasAll(['title', 'registrationPrice', 'date', 'capacity', 'status'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.registrationPrice is number && data.registrationPrice >= 0
+        && data.capacity is number && data.capacity >= 0
+        && data.status is string && data.status.size() <= 30;
+    }
+
+    match /seminars/{seminarId} {
+      allow get: if isValidId(seminarId);
+      allow list: if true;
+      allow create: if isValidId(seminarId) && isAdmin() && isValidSeminar(incoming());
+      allow update: if isValidId(seminarId) && isAdmin() && isValidSeminar(incoming());
+      allow delete: if isValidId(seminarId) && isAdmin();
+    }
+
+    // Seminar Registrations Collection
+    function isValidSeminarRegistration(data) {
+      return data.keys().hasAll(['seminarId', 'customerName', 'customerPhone', 'status'])
+        && data.seminarId is string && data.seminarId.size() > 0 && data.seminarId.size() <= 128
+        && data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 120
+        && data.customerPhone is string && data.customerPhone.size() > 0 && data.customerPhone.size() <= 30
+        && data.status is string && data.status.size() <= 30;
+    }
+
+    match /seminarRegistrations/{registrationId} {
+      allow get: if isValidId(registrationId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(registrationId) && isValidSeminarRegistration(incoming())
+        && (incoming().status == 'pending_payment' || isAdmin());
+      allow update: if isValidId(registrationId) && isAdmin() && isValidSeminarRegistration(incoming());
+      allow delete: if isValidId(registrationId) && isAdmin();
+    }
+
+    // Product Categories Collection
+    function isValidProductCategory(data) {
+      return data.keys().hasAll(['name', 'slug'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.slug is string && data.slug.size() > 0 && data.slug.size() <= 100;
+    }
+
+    match /productCategories/{categoryId} {
+      allow get: if isValidId(categoryId);
+      allow list: if true;
+      allow create: if isValidId(categoryId) && isAdmin() && isValidProductCategory(incoming());
+      allow update: if isValidId(categoryId) && isAdmin() && isValidProductCategory(incoming());
+      allow delete: if isValidId(categoryId) && isAdmin();
+    }
+
+    // Products Collection
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'price', 'unitOfSale', 'stock', 'active'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 150
+        && data.price is number && data.price >= 0
+        && data.unitOfSale is string && data.unitOfSale.size() > 0 && data.unitOfSale.size() <= 50
+        && data.stock is number && data.stock >= 0
+        && data.active is bool;
+    }
+
+    match /products/{productId} {
+      allow get: if isValidId(productId);
+      allow list: if true;
+      allow create: if isValidId(productId) && isAdmin() && isValidProduct(incoming());
+      allow update: if isValidId(productId) && isAdmin() && isValidProduct(incoming());
+      allow delete: if isValidId(productId) && isAdmin();
+    }
+
+    // Orders Collection
+    function isValidOrder(data) {
+      return data.keys().hasAll(['orderReference', 'customerName', 'customerPhone', 'subtotal', 'totalAmount', 'status', 'fulfilmentStatus'])
+        && data.orderReference is string && data.orderReference.size() > 0 && data.orderReference.size() <= 50
+        && data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 120
+        && data.customerPhone is string && data.customerPhone.size() > 0 && data.customerPhone.size() <= 30
+        && data.subtotal is number && data.subtotal >= 0
+        && data.totalAmount is number && data.totalAmount >= 0
+        && data.status is string && data.status.size() <= 30
+        && data.fulfilmentStatus is string && data.fulfilmentStatus.size() <= 40;
+    }
+
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(orderId) && isValidOrder(incoming())
+        && (incoming().status == 'pending_payment' || isAdmin());
+      allow update: if isValidId(orderId) && isAdmin() && isValidOrder(incoming());
+      allow delete: if isValidId(orderId) && isAdmin();
+    }
+
+    // Live-Stream Bookings Collection
+    function isValidLiveStreamBooking(data) {
+      return data.keys().hasAll(['enquiryReference', 'customerName', 'customerPhone', 'eventType', 'eventDate', 'pricingType'])
+        && data.enquiryReference is string && data.enquiryReference.size() > 0 && data.enquiryReference.size() <= 50
+        && data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 120
+        && data.customerPhone is string && data.customerPhone.size() > 0 && data.customerPhone.size() <= 30
+        && data.eventType is string && data.eventType.size() > 0 && data.eventType.size() <= 100
+        && data.eventDate is string && data.eventDate.size() > 0 && data.eventDate.size() <= 30
+        && data.pricingType is string && data.pricingType.size() <= 30;
+    }
+
+    match /livestreamBookings/{bookingId} {
+      allow get: if isValidId(bookingId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(bookingId) && isValidLiveStreamBooking(incoming());
+      allow update: if isValidId(bookingId) && isAdmin() && isValidLiveStreamBooking(incoming());
+      allow delete: if isValidId(bookingId) && isAdmin();
+    }
+
+    // Payments Collection
+    function isValidPayment(data) {
+      return data.keys().hasAll(['internalReference', 'category', 'businessAmount', 'platformFee', 'totalAmountCharged', 'status'])
+        && data.internalReference is string && data.internalReference.size() > 0 && data.internalReference.size() <= 100
+        && data.category is string && data.category.size() > 0 && data.category.size() <= 50
+        && data.businessAmount is number && data.businessAmount >= 0
+        && data.platformFee is number && data.platformFee >= 0
+        && data.totalAmountCharged is number && data.totalAmountCharged >= 0
+        && data.status is string && data.status.size() <= 30;
+    }
+
+    match /payments/{paymentId} {
+      allow get: if isValidId(paymentId) && isAdmin();
+      allow list: if isAdmin();
+      allow create, update, delete: if isValidId(paymentId) && isAdmin() && isValidPayment(incoming());
+    }
+
+    // Refunds Collection
+    match /refunds/{refundId} {
+      allow get: if isValidId(refundId) && isAdmin();
+      allow list: if isAdmin();
+      allow create, update, delete: if isValidId(refundId) && isAdmin();
+    }
+
+    // Notifications Collection
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && isAdmin();
+      allow list: if isAdmin();
+      allow create, update, delete: if isValidId(notificationId) && isAdmin();
+    }
+
+    // Settings Collection
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId);
+      allow list: if isAdmin();
+      allow create, update, delete: if isValidId(settingId) && isAdmin();
+    }
+  }
+}
