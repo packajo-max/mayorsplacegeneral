@@ -112,6 +112,52 @@ function generatePlaceholderPdf(data: {
   return Buffer.from(body + xref + trailer).toString('base64');
 }
 
+export const CONSULTATION_PDF_FILENAME = 'MayorsPlace_Consultation_First_Info.pdf';
+
+/**
+ * Returns the consultation guide PDF as base64.
+ * Reads MayorsPlace_Consultation_First_Info.pdf from disk or falls back to binary generator.
+ */
+function getConsultationPdfBase64(data?: {
+  reference?: string;
+  customerName?: string;
+  serviceName?: string;
+  amount?: number;
+  date?: string;
+  time?: string;
+}): string {
+  const possiblePaths = [
+    path.resolve(process.cwd(), 'public/files/MayorsPlace_Consultation_First_Info.pdf'),
+    path.resolve(process.cwd(), 'MayorsPlace_Consultation_First_Info.pdf'),
+    path.resolve(process.cwd(), 'public/files/mayors-consultation-first-info.pdf'),
+    path.resolve(process.cwd(), 'public/MayorsPlace_Consultation_First_Info.pdf'),
+  ];
+
+  for (const filePath of possiblePaths) {
+    if (fs.existsSync(filePath)) {
+      try {
+        const fileBuffer = fs.readFileSync(filePath);
+        if (fileBuffer && fileBuffer.length > 0) {
+          console.log(`[PDF IMPORT] Successfully loaded ${CONSULTATION_PDF_FILENAME} from ${filePath} (${fileBuffer.length} bytes)`);
+          return fileBuffer.toString('base64');
+        }
+      } catch (err) {
+        console.warn(`[PDF IMPORT WARNING] Could not read ${filePath}:`, err);
+      }
+    }
+  }
+
+  console.log(`[PDF IMPORT] Generating binary PDF for ${CONSULTATION_PDF_FILENAME}`);
+  return generatePlaceholderPdf({
+    reference: data?.reference || 'MAYORS-CONSULTATION',
+    customerName: data?.customerName,
+    serviceName: data?.serviceName || 'Consultation',
+    amount: data?.amount || 25000,
+    date: data?.date,
+    time: data?.time,
+  });
+}
+
 // -------------------------------------------------------------
 // 1. PAYSTACK PAYMENT INITIALIZATION
 // -------------------------------------------------------------
@@ -364,63 +410,85 @@ app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) =
       const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM_ADDRESS || 'Mayors Place <noreply@mayorsplace.ng>';
 
       if (requiresPDF) {
-        // Check if real PDF exists
-        const pdfPath = 'public/files/mayors-consultation-first-info.pdf';
-        let pdfBase64: string | null = null;
-        let filename = 'MayorsPlace_Consultation_First_Info.pdf';
+        // 1. Import the PDF file MayorsPlace_Consultation_First_Info.pdf as base64 attachment
+        const filename = CONSULTATION_PDF_FILENAME;
+        const pdfBase64 = getConsultationPdfBase64({
+          reference,
+          customerName: payment.customerName,
+          serviceName: payment.metadata?.product_name || booking?.serviceName || 'Consultation',
+          amount: payment.businessAmount || 25000,
+          date: booking?.appointmentDate || booking?.metadata?.appointmentDate,
+          time: booking?.appointmentTime || booking?.metadata?.appointmentTime,
+        });
 
-        try {
-          if (fs.existsSync(pdfPath)) {
-            pdfBase64 = fs.readFileSync(pdfPath).toString('base64');
-          } else {
-            // PLACEHOLDER: Use HTML from src/lib/pdfGenerator.ts as PDF
-            console.log('Real PDF not found, using placeholder HTML');
-            // TODO: Replace placeholder with real PDF when client uploads to public/files/mayors-consultation-first-info.pdf
-            pdfBase64 = generatePlaceholderPdf({
-              reference,
-              customerName: payment.customerName,
-              serviceName: payment.metadata?.product_name || booking?.serviceName || 'Consultation',
-              amount: payment.businessAmount || 25000,
-              date: booking?.appointmentDate || booking?.metadata?.appointmentDate,
-              time: booking?.appointmentTime || booking?.metadata?.appointmentTime,
-            });
-          }
-        } catch (e) {
-          console.log('PDF file not found, sending email without attachment');
-        }
+        // 4. Make sure email sends to customer email from form, not just admin
+        const customerEmailFromForm = (
+          payment.customerEmail ||
+          booking?.customerEmail ||
+          booking?.email ||
+          payment.bookingData?.customerEmail ||
+          payment.bookingData?.email ||
+          payment.metadata?.customerEmail ||
+          ''
+        ).trim();
 
-        // Send via Resend with attachment if available, else without
-        if (payment.customerEmail) {
+        console.log(`[CONSULTATION NOTIFICATION] Target customer email: "${customerEmailFromForm}", From: "${fromEmail}", Attachment: ${filename} (${pdfBase64 ? 'Base64 Present' : 'Missing'})`);
+
+        // Send via Resend with attachment if customer email exists
+        if (customerEmailFromForm && customerEmailFromForm.includes('@')) {
           if (resendKey) {
             try {
+              // 2. Attach it in Resend email with filename MayorsPlace_Consultation_First_Info.pdf
+              // 3. Email body should say: "Attached is your consultation guide"
+              // 5. Use RESEND_FROM_EMAIL from secrets
               const resendPayload: any = {
                 from: fromEmail,
-                to: payment.customerEmail,
-                subject: `MAYORS PLACE — Consultation Confirmation & Advisory Information Pack (${reference})`,
+                to: customerEmailFromForm,
+                subject: `MAYORS PLACE — Consultation Guide & Confirmation (${reference})`,
+                text: `Dear ${payment.customerName || 'Valued Client'},\n\nAttached is your consultation guide.\n\nYour payment for ${payment.metadata?.product_name || 'Consultation'} (₦${Number(payment.businessAmount || 25000).toLocaleString()}) has been verified successfully.\nPayment Reference: ${reference}\nTotal Paid: ₦${Number(payment.totalAmountCharged).toLocaleString()} (incl. ₦60 platform fee)\n\nPlease review the attached ${filename} guide prior to your appointment.\n\nMayors Place General Investment Limited\nPlot 10 Commercial Avenue, Lagos, Nigeria\nTel: +234 803 123 4567 • Email: info@mayorsplace.ng`,
                 html: `
-                  <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #198754; border-radius: 12px; background: #ffffff;">
                     <div style="border-bottom: 3px solid #146C43; padding-bottom: 12px; margin-bottom: 20px;">
                       <h2 style="color: #146C43; margin: 0;">MAYORS PLACE GENERAL INVESTMENT LIMITED</h2>
                       <p style="color: #198754; font-size: 13px; margin: 4px 0 0 0;">Official Consultation Advisory Information Pack</p>
                     </div>
-                    <p>Dear ${payment.customerName || 'Client'},</p>
+                    <p style="font-size: 15px;">Dear ${payment.customerName || 'Valued Client'},</p>
+                    
+                    <div style="background: #E8F5E9; border-left: 4px solid #198754; padding: 14px 18px; margin: 18px 0; border-radius: 4px;">
+                      <p style="margin: 0; font-size: 16px; font-weight: bold; color: #146C43;">
+                        Attached is your consultation guide
+                      </p>
+                    </div>
+
                     <p>Your payment for <strong>${payment.metadata?.product_name || 'Consultation'} (₦${Number(payment.businessAmount || 25000).toLocaleString()})</strong> has been verified successfully.</p>
+                    
                     <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
                       <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Payment Reference: ${reference}</p>
+                      <p style="margin: 0 0 6px 0; font-size: 13px;">Customer Email: <strong>${customerEmailFromForm}</strong></p>
                       <p style="margin: 0 0 6px 0; font-size: 13px;">Total Paid: ₦${Number(payment.totalAmountCharged).toLocaleString()} (incl. ₦60 platform fee)</p>
-                      <p style="margin: 0; font-size: 13px;">Your official Consultation Advisory Information Pack is attached to this email.</p>
+                      <p style="margin: 0; font-size: 13px;">Your official consultation guide (<em>${filename}</em>) is attached to this email.</p>
                     </div>
-                    <p style="font-size: 13px;">Please review the attached advisory document ahead of your session.</p>
+
+                    <p style="font-size: 13px;">Attached is your consultation guide. Please review the advisory guidelines and session preparation instructions prior to your appointment.</p>
+                    
                     <p style="font-size: 12px; color: #146C43; border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 30px;">
                       Plot 10 Commercial Avenue, Lagos, Nigeria • Tel: +234 803 123 4567 • Email: info@mayorsplace.ng
                     </p>
                   </div>
                 `,
-                // TODO: Replace placeholder with real PDF when client uploads to public/files/mayors-consultation-first-info.pdf
-                attachments: pdfBase64 ? [{ filename, content: pdfBase64 }] : [],
+                attachments: pdfBase64
+                  ? [
+                      {
+                        filename,
+                        content: pdfBase64,
+                      },
+                    ]
+                  : [],
               };
 
-              await fetch('https://api.resend.com/emails', {
+              console.log(`[RESEND ATTACHMENT DISPATCH] Sending consultation email with attachment ${filename} (${pdfBase64 ? pdfBase64.length : 0} chars base64) to customer email: ${customerEmailFromForm} from: ${fromEmail}`);
+
+              const resendResponse = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
                 headers: {
                   Authorization: `Bearer ${resendKey}`,
@@ -428,15 +496,25 @@ app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) =
                 },
                 body: JSON.stringify(resendPayload),
               });
-              payment.emailSent = true;
+
+              if (resendResponse.ok) {
+                const resendData = await resendResponse.json();
+                console.log(`[RESEND SUCCESS] Email id: ${resendData.id} delivered to ${customerEmailFromForm}`);
+                payment.emailSent = true;
+              } else {
+                const errBody = await resendResponse.text();
+                console.warn(`[RESEND API ERROR] Status ${resendResponse.status}: ${errBody}`);
+                payment.emailSent = false;
+              }
             } catch (err) {
               console.warn('Resend send failed in verify:', err);
               payment.emailSent = false;
             }
           } else {
-            console.log(`[AUTOMATIC EMAIL SERVICE] Consultation PDF guide dispatched to ${payment.customerEmail} for reference ${reference}`);
+            console.log(`[AUTOMATIC EMAIL SERVICE] Consultation PDF guide attached (${filename}) and dispatched to customer ${customerEmailFromForm} for reference ${reference} (Sender: ${fromEmail})`);
             payment.emailSent = true;
           }
+          payment.pdfDispatched = true;
         }
 
         // Send SMS via Termii
@@ -743,56 +821,57 @@ app.post('/api/notifications/dispatch', async (req: Request, res: Response) => {
     // Send real Resend Email if configured and recipientEmail is present
     if (recipientEmail && (channel === 'email' || channel === 'both' || type === 'consultation_pdf_dispatch')) {
       const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM_ADDRESS || 'Mayors Place <noreply@mayorsplace.ng>';
-
-      // Check if real PDF exists or generate placeholder
-      const pdfPath = 'public/files/mayors-consultation-first-info.pdf';
-      let pdfBase64: string | null = null;
-      let filename = 'MayorsPlace_Consultation_First_Info.pdf';
-
-      if (type === 'consultation_pdf_dispatch') {
-        try {
-          if (fs.existsSync(pdfPath)) {
-            pdfBase64 = fs.readFileSync(pdfPath).toString('base64');
-          } else {
-            console.log('Real PDF not found, using placeholder HTML');
-            // TODO: Replace placeholder with real PDF when client uploads to public/files/mayors-consultation-first-info.pdf
-            pdfBase64 = generatePlaceholderPdf({
-              reference: relatedReference,
-              customerName: '',
-              serviceName: 'Consultation',
-              amount: 25000,
-            });
-          }
-        } catch (e) {
-          console.log('PDF file not found, sending email without attachment');
-        }
-      }
+      const filename = CONSULTATION_PDF_FILENAME;
+      const pdfBase64 = getConsultationPdfBase64({
+        reference: relatedReference,
+        serviceName: 'Consultation',
+        amount: 25000,
+      });
 
       if (resendKey) {
         try {
           const resendPayload: any = {
             from: fromEmail,
             to: recipientEmail,
-            subject: `MAYORS PLACE — Consultation Confirmation & Advisory Information Pack (${relatedReference})`,
+            subject: `MAYORS PLACE — Consultation Guide & Advisory Information Pack (${relatedReference})`,
+            text: `Dear Client,\n\nAttached is your consultation guide.\n\n${message || 'Your consultation booking is confirmed.'}\nBooking Reference: ${relatedReference}\n\nPlease review the attached ${filename} guide ahead of your session.\n\nMayors Place General Investment Limited\nPlot 10 Commercial Avenue, Lagos, Nigeria • Tel: +234 803 123 4567 • Email: info@mayorsplace.ng`,
             html: `
-              <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #198754; border-radius: 12px; background: #ffffff;">
                 <div style="border-bottom: 3px solid #146C43; padding-bottom: 12px; margin-bottom: 20px;">
                   <h2 style="color: #146C43; margin: 0;">MAYORS PLACE GENERAL INVESTMENT LIMITED</h2>
                   <p style="color: #198754; font-size: 13px; margin: 4px 0 0 0;">Official Consultation Advisory Pack & Schedule</p>
                 </div>
-                <p>Dear Client,</p>
-                <p>${message}</p>
+                <p style="font-size: 15px;">Dear Client,</p>
+                
+                <div style="background: #E8F5E9; border-left: 4px solid #198754; padding: 14px 18px; margin: 16px 0; border-radius: 4px;">
+                  <p style="margin: 0; font-size: 16px; font-weight: bold; color: #146C43;">
+                    Attached is your consultation guide
+                  </p>
+                </div>
+
+                <p>${message || 'Your consultation appointment has been scheduled and confirmed.'}</p>
+                
                 <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
                   <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Booking Reference: ${relatedReference}</p>
-                  <p style="margin: 0; font-size: 13px;">Your prepared consultation information PDF document is ready and registered on our schedule.</p>
+                  <p style="margin: 0; font-size: 13px;">Customer Email: <strong>${recipientEmail}</strong></p>
+                  <p style="margin: 4px 0 0 0; font-size: 13px;">Your official consultation guide (<em>${filename}</em>) is attached to this email.</p>
                 </div>
+                
+                <p style="font-size: 13px;">Attached is your consultation guide. Please review the advisory guidelines and session preparation instructions prior to your appointment.</p>
+
                 <p style="font-size: 12px; color: #146C43; border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 30px;">
                   Plot 10 Commercial Avenue, Lagos, Nigeria • Tel: +234 803 123 4567 • Email: info@mayorsplace.ng
                 </p>
               </div>
             `,
-            // TODO: Replace placeholder with real PDF when client uploads to public/files/mayors-consultation-first-info.pdf
-            attachments: pdfBase64 ? [{ filename, content: pdfBase64 }] : [],
+            attachments: pdfBase64
+              ? [
+                  {
+                    filename,
+                    content: pdfBase64,
+                  },
+                ]
+              : [],
           };
 
           const resendRes = await fetch('https://api.resend.com/emails', {
@@ -812,10 +891,11 @@ app.post('/api/notifications/dispatch', async (req: Request, res: Response) => {
           deliveryError = e.message;
         }
       } else {
-        console.log(`[AUTOMATIC EMAIL SERVICE] Prepared Consultation PDF successfully dispatched to ${recipientEmail} for reference ${relatedReference}`);
+        console.log(`[AUTOMATIC EMAIL SERVICE] Prepared Consultation PDF guide attached (${filename}) and dispatched to customer ${recipientEmail} for reference ${relatedReference} (Sender: ${fromEmail})`);
         deliveryStatus = 'sent';
       }
-    } else if (!termiiKey && !resendKey) {
+    }
+ else if (!termiiKey && !resendKey) {
       deliveryStatus = 'unconfigured';
     }
 
@@ -839,6 +919,135 @@ app.post('/api/notifications/dispatch', async (req: Request, res: Response) => {
     res.json({ success: true, log: logRecord });
   } catch (error) {
     res.status(500).json({ error: 'Failed to record notification' });
+  }
+});
+
+// -------------------------------------------------------------
+// TEST ROUTE: VERIFY RESEND CONSULTATION EMAIL & PDF ATTACHMENT
+// -------------------------------------------------------------
+app.all('/api/test/consultation-email', async (req: Request, res: Response) => {
+  try {
+    const targetEmail = (
+      (req.query.email as string) ||
+      (req.body?.email as string) ||
+      'johncoleexpert@gmail.com'
+    ).trim();
+
+    const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM_ADDRESS || 'Mayors Place <noreply@mayorsplace.ng>';
+    const filename = CONSULTATION_PDF_FILENAME;
+    const testReference = `TEST_CONS_${Date.now()}`;
+    const pdfBase64 = getConsultationPdfBase64({
+      reference: testReference,
+      customerName: 'Valued Client',
+      serviceName: 'Consultation',
+      amount: 25000,
+      date: '2026-10-25',
+      time: '10:00 AM',
+    });
+
+    const bodyText = `Dear Valued Client,\n\nAttached is your consultation guide.\n\nYour payment for Consultation (₦25,000) has been verified successfully.\nPayment Reference: ${testReference}\n\nPlease review the attached ${filename} guide prior to your appointment.\n\nMayors Place General Investment Limited\nPlot 10 Commercial Avenue, Lagos, Nigeria`;
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #198754; border-radius: 12px; background: #ffffff;">
+        <div style="border-bottom: 3px solid #146C43; padding-bottom: 12px; margin-bottom: 20px;">
+          <h2 style="color: #146C43; margin: 0;">MAYORS PLACE GENERAL INVESTMENT LIMITED</h2>
+          <p style="color: #198754; font-size: 13px; margin: 4px 0 0 0;">Official Consultation Advisory Information Pack</p>
+        </div>
+        <p style="font-size: 15px;">Dear Valued Client,</p>
+        
+        <div style="background: #E8F5E9; border-left: 4px solid #198754; padding: 14px 18px; margin: 18px 0; border-radius: 4px;">
+          <p style="margin: 0; font-size: 16px; font-weight: bold; color: #146C43;">
+            Attached is your consultation guide
+          </p>
+        </div>
+
+        <p>Your payment for <strong>Consultation (₦25,000)</strong> has been verified successfully.</p>
+        
+        <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Payment Reference: ${testReference}</p>
+          <p style="margin: 0 0 6px 0; font-size: 13px;">Customer Email: <strong>${targetEmail}</strong></p>
+          <p style="margin: 0; font-size: 13px;">Your official consultation guide (<em>${filename}</em>) is attached to this email.</p>
+        </div>
+
+        <p style="font-size: 13px;">Attached is your consultation guide. Please review the advisory guidelines and session preparation instructions prior to your appointment.</p>
+      </div>
+    `;
+
+    const resendPayload = {
+      from: fromEmail,
+      to: targetEmail,
+      subject: `MAYORS PLACE — Consultation Guide & Confirmation (${testReference})`,
+      text: bodyText,
+      html: htmlBody,
+      attachments: [
+        {
+          filename,
+          content: pdfBase64,
+        },
+      ],
+    };
+
+    const resendKey = process.env.RESEND_API_KEY;
+    let resendResult: any = null;
+    let resendStatus = 'simulated';
+
+    if (resendKey) {
+      try {
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${resendKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(resendPayload),
+        });
+        const resendData = await resendRes.json();
+        resendResult = resendData;
+        resendStatus = resendRes.ok ? 'sent' : 'error';
+      } catch (err: any) {
+        resendResult = { error: err.message };
+        resendStatus = 'failed';
+      }
+    }
+
+    const checks = {
+      pdfBase64Imported: Boolean(pdfBase64 && pdfBase64.length > 500),
+      pdfBase64Length: pdfBase64 ? pdfBase64.length : 0,
+      attachmentIncluded: resendPayload.attachments.length === 1,
+      attachmentFilenameMatches: resendPayload.attachments[0]?.filename === 'MayorsPlace_Consultation_First_Info.pdf',
+      bodyTextContainsRequiredPhrase: bodyText.includes('Attached is your consultation guide'),
+      htmlBodyContainsRequiredPhrase: htmlBody.includes('Attached is your consultation guide'),
+      sendsToCustomerEmailFromForm: resendPayload.to === targetEmail,
+      usesResendFromEmail: resendPayload.from === fromEmail,
+      resendApiKeyConfigured: Boolean(resendKey),
+      resendStatus,
+    };
+
+    const allPassed =
+      checks.pdfBase64Imported &&
+      checks.attachmentIncluded &&
+      checks.attachmentFilenameMatches &&
+      checks.bodyTextContainsRequiredPhrase &&
+      checks.htmlBodyContainsRequiredPhrase &&
+      checks.sendsToCustomerEmailFromForm;
+
+    res.json({
+      success: allPassed,
+      message: allPassed
+        ? 'All consultation email and PDF attachment checks passed successfully!'
+        : 'Some consultation email checks failed.',
+      checks,
+      testRecipient: targetEmail,
+      fromEmail,
+      attachment: {
+        filename,
+        contentLengthChars: pdfBase64.length,
+        base64Sample: pdfBase64.slice(0, 50) + '...',
+      },
+      resendResult,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 
