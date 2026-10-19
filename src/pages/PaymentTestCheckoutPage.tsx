@@ -26,7 +26,7 @@ export const PaymentTestCheckoutPage: React.FC<PaymentTestCheckoutPageProps> = (
 
   const subaccountNetSettlement = Math.max(0, businessAmount - paystackFee);
 
-  const [cardNumber, setCardNumber] = useState('4084 0841 0841 0841');
+  const [cardNumber, setCardNumber] = useState('4084 0840 8408 4081');
   const [expiry, setExpiry] = useState('12/28');
   const [cvv, setCvv] = useState('408');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -34,7 +34,7 @@ export const PaymentTestCheckoutPage: React.FC<PaymentTestCheckoutPageProps> = (
   const handleSimulateSuccess = async () => {
     setIsProcessing(true);
     try {
-      const res = await fetch(`/api/paystack/verify/${encodeURIComponent(reference)}`);
+      const res = await fetch(`/api/paystack/verify/${encodeURIComponent(reference)}?simulate=true`);
       await res.json();
       navigate(`/payment-success?reference=${reference}`);
     } catch {

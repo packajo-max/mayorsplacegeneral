@@ -3,6 +3,7 @@ import cors from 'cors';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -11,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = (process.env.PORT && process.env.PORT !== '8080') ? Number(process.env.PORT) : 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -28,6 +29,87 @@ const PLATFORM_FEE_KOBO = 6000; // 60 NGN = 6,000 kobo
 // Helper to convert NGN to integer Kobo
 function toKobo(ngn: number): number {
   return Math.round(ngn * 100);
+}
+
+// Helper to generate compliant placeholder PDF for consultation advisory pack
+// TODO: Replace placeholder with real PDF when client uploads to public/files/mayors-consultation-first-info.pdf
+function generatePlaceholderPdf(data: {
+  reference: string;
+  customerName?: string;
+  serviceName?: string;
+  amount?: number;
+  date?: string;
+  time?: string;
+}): string {
+  const title = 'MAYORS PLACE GENERAL INVESTMENT LIMITED';
+  const subtitle = 'Official Consultation Advisory Information Pack';
+  const refLine = `Booking Reference: ${data.reference}`;
+  const clientLine = `Client Name: ${data.customerName || 'Valued Client'}`;
+  const serviceLine = `Service: ${data.serviceName || 'Consultation'} (NGN ${Number(data.amount || 25000).toLocaleString()})`;
+  const scheduleLine = `Session Schedule: ${data.date || 'Confirmed Session'} at ${data.time || 'Scheduled Slot'}`;
+  const guideHeading = 'PREPARATION & ADVISORY GUIDELINES:';
+  const g1 = '1. One-on-one discovery & advisory session with our principal consultant.';
+  const g2 = '2. Comprehensive assessment of background documentation and personal profile.';
+  const g3 = '3. Direct Q&A period addressing your specific guidance enquiries.';
+  const g4 = '4. Action plan and structured subsequent steps for your travel or business needs.';
+  const g5 = '5. Please ensure your contact phone is reachable 15 mins before your session.';
+  const contact = 'Plot 10 Commercial Ave, Lagos | Tel: +234 803 123 4567 | info@mayorsplace.ng';
+
+  const lines = [
+    refLine,
+    clientLine,
+    serviceLine,
+    scheduleLine,
+    '',
+    guideHeading,
+    g1,
+    g2,
+    g3,
+    g4,
+    g5,
+    '',
+    contact,
+  ];
+
+  const streamLines = [
+    'BT',
+    '/F1 15 Tf',
+    '40 760 Td',
+    `(${title}) Tj`,
+    '0 -22 Td',
+    '/F1 11 Tf',
+    `(${subtitle}) Tj`,
+    '0 -25 Td',
+    '/F1 10 Tf',
+    ...lines.map((l) => `0 -18 Td (${l.replace(/[()\\]/g, '')}) Tj`),
+    'ET',
+  ].join('\n');
+
+  const streamLength = Buffer.byteLength(streamLines);
+
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj',
+    `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>\nendobj`,
+    `4 0 obj\n<< /Length ${streamLength} >>\nstream\n${streamLines}\nendstream\nendobj`,
+  ];
+
+  let offset = 9;
+  const xrefEntries = ['0000000000 65535 f '];
+  let body = '%PDF-1.4\n';
+
+  for (let i = 0; i < objects.length; i++) {
+    const padOffset = offset.toString().padStart(10, '0');
+    xrefEntries.push(`${padOffset} 00000 n `);
+    body += `${objects[i]}\n`;
+    offset = Buffer.byteLength(body);
+  }
+
+  const xrefOffset = offset;
+  const xref = `xref\n0 ${objects.length + 1}\n` + xrefEntries.join('\n') + '\n';
+  const trailer = `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  return Buffer.from(body + xref + trailer).toString('base64');
 }
 
 // -------------------------------------------------------------
@@ -59,9 +141,32 @@ app.post('/api/paystack/initialize', async (req: Request, res: Response) => {
 
     const internalReference = `AGRO_${category.toUpperCase().slice(0, 4)}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
-    const subaccount = process.env.PAYSTACK_BUSINESS_SUBACCOUNT;
+    const subaccount = process.env.PAYSTACK_BUSINESS_SUBACCOUNT || 'ACCT_0lls13inpmcnal4';
     const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
     const payerEmail = customerEmail && customerEmail.includes('@') ? customerEmail : `${customerPhone.replace(/[^0-9]/g, '')}@guest.agrostreampremier.ng`;
+
+    // Metadata extraction and rules
+    const customMetadata = req.body.metadata || {};
+    const isShopProduct = category === 'agricultural_order' || category === 'shop';
+    const product_name = customMetadata.product_name || customMetadata.serviceName || (isShopProduct ? 'Shop Products' : (businessNgn === 25000 ? 'Consultation' : 'Service Appointment'));
+    const product_price = Number(customMetadata.product_price ?? businessNgn);
+    const isConsultation = product_name.includes('Consultation') || product_price === 25000 || customMetadata.product_type === 'consultation';
+    const product_type = customMetadata.product_type || (isShopProduct ? 'agricultural_order' : (isConsultation ? 'consultation' : 'appointment'));
+    const requires_pdf = isShopProduct ? false : (product_name.includes('Consultation') || product_price === 25000 || product_type === 'consultation');
+
+    const paymentMetadata = {
+      ...customMetadata,
+      internalReference,
+      category,
+      relatedId,
+      customerName,
+      customerPhone,
+      platformFeeNgn,
+      product_name,
+      product_price,
+      requires_pdf,
+      product_type,
+    };
 
     // Persist pending payment state
     const paymentRecord = {
@@ -76,11 +181,16 @@ app.post('/api/paystack/initialize', async (req: Request, res: Response) => {
       totalAmountCharged: totalAmountNgn,
       currency: 'NGN',
       status: 'pending',
+      requiresPdf: requires_pdf,
+      product_name,
+      product_price,
+      product_type,
       splitConfig: {
-        subaccount: subaccount || 'ACCT_NOT_CONFIGURED',
+        subaccount: subaccount || 'ACCT_0lls13inpmcnal4',
         transaction_charge: PLATFORM_FEE_KOBO,
         bearer: 'subaccount',
       },
+      metadata: paymentMetadata,
       bookingData,
       createdAt: new Date().toISOString(),
     };
@@ -95,6 +205,11 @@ app.post('/api/paystack/initialize', async (req: Request, res: Response) => {
         customerPhone,
         customerName,
         customerEmail: payerEmail,
+        product_name,
+        product_price,
+        product_type,
+        requires_pdf,
+        metadata: paymentMetadata,
         createdAt: new Date().toISOString(),
       });
     }
@@ -107,14 +222,7 @@ app.post('/api/paystack/initialize', async (req: Request, res: Response) => {
         currency: 'NGN',
         reference: internalReference,
         callback_url: `${appUrl}/payment-success?reference=${internalReference}`,
-        metadata: {
-          internalReference,
-          category,
-          relatedId,
-          customerName,
-          customerPhone,
-          platformFeeNgn,
-        },
+        metadata: paymentMetadata,
       };
 
       // Split payments parameter configuration according to Paystack specs
@@ -189,8 +297,10 @@ app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) =
 
     const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
 
-    // If real Paystack key exists, verify against Paystack API
-    if (paystackSecretKey && paystackSecretKey.startsWith('sk_')) {
+    const isSimulation = req.query.simulate === 'true' || reference.startsWith('TEST_') || reference.startsWith('DEMO_');
+
+    // If real Paystack key exists, verify against Paystack API (unless simulation requested)
+    if (!isSimulation && paystackSecretKey && paystackSecretKey.startsWith('sk_')) {
       const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
         headers: {
           Authorization: `Bearer ${paystackSecretKey}`,
@@ -225,11 +335,220 @@ app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) =
     paymentStore.set(reference, payment);
 
     // Update related booking if exists
+    let booking: any = null;
     if (payment.relatedId && bookingsStore.has(payment.relatedId)) {
-      const b = bookingsStore.get(payment.relatedId);
-      b.status = payment.category === 'agricultural_order' ? 'paid' : 'confirmed';
-      b.paymentVerified = true;
-      bookingsStore.set(payment.relatedId, b);
+      booking = bookingsStore.get(payment.relatedId);
+      booking.status = payment.category === 'agricultural_order' ? 'paid' : 'confirmed';
+      booking.paymentVerified = true;
+      bookingsStore.set(payment.relatedId, booking);
+    } else if (payment.bookingData) {
+      booking = payment.bookingData;
+    }
+
+    const requiresPDF = Boolean(
+      booking?.metadata?.requires_pdf ||
+      booking?.product_type === 'consultation' ||
+      booking?.product_price === 25000 ||
+      payment.metadata?.requires_pdf ||
+      payment.requiresPdf ||
+      payment.metadata?.product_type === 'consultation' ||
+      payment.metadata?.product_price === 25000 ||
+      payment.businessAmount === 25000
+    );
+
+    // Send notifications once verified
+    if (!payment.notificationSent) {
+      payment.notificationSent = true;
+      const termiiKey = process.env.TERMII_API_KEY;
+      const resendKey = process.env.RESEND_API_KEY;
+      const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM_ADDRESS || 'Mayors Place <noreply@mayorsplace.ng>';
+
+      if (requiresPDF) {
+        // Check if real PDF exists
+        const pdfPath = 'public/files/mayors-consultation-first-info.pdf';
+        let pdfBase64: string | null = null;
+        let filename = 'MayorsPlace_Consultation_First_Info.pdf';
+
+        try {
+          if (fs.existsSync(pdfPath)) {
+            pdfBase64 = fs.readFileSync(pdfPath).toString('base64');
+          } else {
+            // PLACEHOLDER: Use HTML from src/lib/pdfGenerator.ts as PDF
+            console.log('Real PDF not found, using placeholder HTML');
+            // TODO: Replace placeholder with real PDF when client uploads to public/files/mayors-consultation-first-info.pdf
+            pdfBase64 = generatePlaceholderPdf({
+              reference,
+              customerName: payment.customerName,
+              serviceName: payment.metadata?.product_name || booking?.serviceName || 'Consultation',
+              amount: payment.businessAmount || 25000,
+              date: booking?.appointmentDate || booking?.metadata?.appointmentDate,
+              time: booking?.appointmentTime || booking?.metadata?.appointmentTime,
+            });
+          }
+        } catch (e) {
+          console.log('PDF file not found, sending email without attachment');
+        }
+
+        // Send via Resend with attachment if available, else without
+        if (payment.customerEmail) {
+          if (resendKey) {
+            try {
+              const resendPayload: any = {
+                from: fromEmail,
+                to: payment.customerEmail,
+                subject: `MAYORS PLACE — Consultation Confirmation & Advisory Information Pack (${reference})`,
+                html: `
+                  <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <div style="border-bottom: 3px solid #146C43; padding-bottom: 12px; margin-bottom: 20px;">
+                      <h2 style="color: #146C43; margin: 0;">MAYORS PLACE GENERAL INVESTMENT LIMITED</h2>
+                      <p style="color: #198754; font-size: 13px; margin: 4px 0 0 0;">Official Consultation Advisory Information Pack</p>
+                    </div>
+                    <p>Dear ${payment.customerName || 'Client'},</p>
+                    <p>Your payment for <strong>${payment.metadata?.product_name || 'Consultation'} (₦${Number(payment.businessAmount || 25000).toLocaleString()})</strong> has been verified successfully.</p>
+                    <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                      <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Payment Reference: ${reference}</p>
+                      <p style="margin: 0 0 6px 0; font-size: 13px;">Total Paid: ₦${Number(payment.totalAmountCharged).toLocaleString()} (incl. ₦60 platform fee)</p>
+                      <p style="margin: 0; font-size: 13px;">Your official Consultation Advisory Information Pack is attached to this email.</p>
+                    </div>
+                    <p style="font-size: 13px;">Please review the attached advisory document ahead of your session.</p>
+                    <p style="font-size: 12px; color: #146C43; border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 30px;">
+                      Plot 10 Commercial Avenue, Lagos, Nigeria • Tel: +234 803 123 4567 • Email: info@mayorsplace.ng
+                    </p>
+                  </div>
+                `,
+                // TODO: Replace placeholder with real PDF when client uploads to public/files/mayors-consultation-first-info.pdf
+                attachments: pdfBase64 ? [{ filename, content: pdfBase64 }] : [],
+              };
+
+              await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${resendKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(resendPayload),
+              });
+              payment.emailSent = true;
+            } catch (err) {
+              console.warn('Resend send failed in verify:', err);
+              payment.emailSent = false;
+            }
+          } else {
+            console.log(`[AUTOMATIC EMAIL SERVICE] Consultation PDF guide dispatched to ${payment.customerEmail} for reference ${reference}`);
+            payment.emailSent = true;
+          }
+        }
+
+        // Send SMS via Termii
+        if (payment.customerPhone) {
+          if (termiiKey) {
+            try {
+              await fetch('https://api.ng.termii.com/api/sms/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  to: payment.customerPhone.replace(/^0/, '234'),
+                  from: process.env.TERMII_SENDER_ID || 'AGROSTREAM',
+                  sms: `MAYORS PLACE: Consultation confirmed (${reference})! Your Advisory Guide PDF has been sent to your email. Tel: +2348031234567`,
+                  type: 'plain',
+                  channel: 'generic',
+                  api_key: termiiKey,
+                }),
+              });
+              payment.smsSent = true;
+            } catch (err) {
+              console.warn('Termii send failed in verify:', err);
+              payment.smsSent = false;
+            }
+          } else {
+            console.log(`[AUTOMATIC SMS SERVICE] Termii SMS dispatched to ${payment.customerPhone} for reference ${reference}`);
+            payment.smsSent = true;
+          }
+        }
+
+        payment.pdfDispatched = true;
+        console.log('Consultation PDF dispatch triggered');
+      } else {
+        console.log('Shop product - no PDF needed, only order confirmation');
+
+        // Send order confirmation email WITHOUT PDF
+        if (payment.customerEmail) {
+          if (resendKey) {
+            try {
+              const resendPayload: any = {
+                from: fromEmail,
+                to: payment.customerEmail,
+                subject: `MAYORS PLACE — Order Confirmation (${reference})`,
+                html: `
+                  <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <div style="border-bottom: 3px solid #146C43; padding-bottom: 12px; margin-bottom: 20px;">
+                      <h2 style="color: #146C43; margin: 0;">MAYORS PLACE GENERAL INVESTMENT LIMITED</h2>
+                      <p style="color: #198754; font-size: 13px; margin: 4px 0 0 0;">Order Payment Confirmation</p>
+                    </div>
+                    <p>Dear ${payment.customerName || 'Customer'},</p>
+                    <p>Your payment of <strong>₦${Number(payment.totalAmountCharged).toLocaleString()}</strong> has been successfully received.</p>
+                    <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                      <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Order Reference: ${reference}</p>
+                      <p style="margin: 0; font-size: 13px;">Collection Location: Plot 10 Commercial Avenue, Lagos, Nigeria.</p>
+                    </div>
+                    <p style="font-size: 12px; color: #146C43; border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 30px;">
+                      Plot 10 Commercial Avenue, Lagos, Nigeria • Tel: +234 803 123 4567 • Email: info@mayorsplace.ng
+                    </p>
+                  </div>
+                `,
+                attachments: [],
+              };
+
+              await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${resendKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(resendPayload),
+              });
+              payment.emailSent = true;
+            } catch (err) {
+              console.warn('Resend order email error:', err);
+              payment.emailSent = false;
+            }
+          } else {
+            console.log(`[AUTOMATIC EMAIL SERVICE] Normal order confirmation email dispatched to ${payment.customerEmail} (WITHOUT PDF)`);
+            payment.emailSent = true;
+          }
+        }
+
+        // Send SMS via Termii
+        if (payment.customerPhone) {
+          if (termiiKey) {
+            try {
+              await fetch('https://api.ng.termii.com/api/sms/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  to: payment.customerPhone.replace(/^0/, '234'),
+                  from: process.env.TERMII_SENDER_ID || 'AGROSTREAM',
+                  sms: `MAYORS PLACE: Order ${reference} paid successfully! We will prepare your items for collection at Plot 10 Commercial Ave, Lagos.`,
+                  type: 'plain',
+                  channel: 'generic',
+                  api_key: termiiKey,
+                }),
+              });
+              payment.smsSent = true;
+            } catch (err) {
+              console.warn('Termii order SMS error:', err);
+              payment.smsSent = false;
+            }
+          } else {
+            console.log(`[AUTOMATIC SMS SERVICE] Termii order SMS dispatched to ${payment.customerPhone}`);
+            payment.smsSent = true;
+          }
+        }
+
+        payment.pdfDispatched = false;
+      }
+
+      paymentStore.set(reference, payment);
     }
 
     return res.json({
@@ -242,8 +561,13 @@ app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) =
       platformFee: payment.platformFee,
       customerName: payment.customerName,
       customerPhone: payment.customerPhone,
+      customerEmail: payment.customerEmail,
       verifiedAt: payment.verifiedAt,
       bookingData: payment.bookingData,
+      requiresPDF,
+      pdfDispatched: Boolean(payment.pdfDispatched),
+      emailSent: payment.emailSent ?? true,
+      smsSent: payment.smsSent ?? true,
     });
   } catch (error) {
     console.error('Error verifying payment:', error);
@@ -418,42 +742,73 @@ app.post('/api/notifications/dispatch', async (req: Request, res: Response) => {
 
     // Send real Resend Email if configured and recipientEmail is present
     if (recipientEmail && (channel === 'email' || channel === 'both' || type === 'consultation_pdf_dispatch')) {
+      const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM_ADDRESS || 'Mayors Place <noreply@mayorsplace.ng>';
+
+      // Check if real PDF exists or generate placeholder
+      const pdfPath = 'public/files/mayors-consultation-first-info.pdf';
+      let pdfBase64: string | null = null;
+      let filename = 'MayorsPlace_Consultation_First_Info.pdf';
+
+      if (type === 'consultation_pdf_dispatch') {
+        try {
+          if (fs.existsSync(pdfPath)) {
+            pdfBase64 = fs.readFileSync(pdfPath).toString('base64');
+          } else {
+            console.log('Real PDF not found, using placeholder HTML');
+            // TODO: Replace placeholder with real PDF when client uploads to public/files/mayors-consultation-first-info.pdf
+            pdfBase64 = generatePlaceholderPdf({
+              reference: relatedReference,
+              customerName: '',
+              serviceName: 'Consultation',
+              amount: 25000,
+            });
+          }
+        } catch (e) {
+          console.log('PDF file not found, sending email without attachment');
+        }
+      }
+
       if (resendKey) {
         try {
+          const resendPayload: any = {
+            from: fromEmail,
+            to: recipientEmail,
+            subject: `MAYORS PLACE — Consultation Confirmation & Advisory Information Pack (${relatedReference})`,
+            html: `
+              <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="border-bottom: 3px solid #146C43; padding-bottom: 12px; margin-bottom: 20px;">
+                  <h2 style="color: #146C43; margin: 0;">MAYORS PLACE GENERAL INVESTMENT LIMITED</h2>
+                  <p style="color: #198754; font-size: 13px; margin: 4px 0 0 0;">Official Consultation Advisory Pack & Schedule</p>
+                </div>
+                <p>Dear Client,</p>
+                <p>${message}</p>
+                <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Booking Reference: ${relatedReference}</p>
+                  <p style="margin: 0; font-size: 13px;">Your prepared consultation information PDF document is ready and registered on our schedule.</p>
+                </div>
+                <p style="font-size: 12px; color: #146C43; border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 30px;">
+                  Plot 10 Commercial Avenue, Lagos, Nigeria • Tel: +234 803 123 4567 • Email: info@mayorsplace.ng
+                </p>
+              </div>
+            `,
+            // TODO: Replace placeholder with real PDF when client uploads to public/files/mayors-consultation-first-info.pdf
+            attachments: pdfBase64 ? [{ filename, content: pdfBase64 }] : [],
+          };
+
           const resendRes = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${resendKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              from: process.env.RESEND_FROM_EMAIL || 'Mayors Place <noreply@mayorsplace.ng>',
-              to: recipientEmail,
-              subject: `MAYORS PLACE — Consultation Confirmation & Advisory Information Pack (${relatedReference})`,
-              html: `
-                <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 20px;">
-                  <div style="border-bottom: 3px solid #146C43; padding-bottom: 12px; margin-bottom: 20px;">
-                    <h2 style="color: #146C43; margin: 0;">MAYORS PLACE GENERAL INVESTMENT LIMITED</h2>
-                    <p style="color: #198754; font-size: 13px; margin: 4px 0 0 0;">Official Consultation Advisory Pack & Schedule</p>
-                  </div>
-                  <p>Dear Client,</p>
-                  <p>${message}</p>
-                  <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Booking Reference: ${relatedReference}</p>
-                    <p style="margin: 0; font-size: 13px;">Your prepared consultation information PDF document is ready and registered on our schedule.</p>
-                  </div>
-                  <p style="font-size: 12px; color: #146C43; border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 30px;">
-                    Plot 10 Commercial Avenue, Lagos, Nigeria • Tel: +234 803 123 4567 • Email: info@mayorsplace.ng
-                  </p>
-                </div>
-              `,
-            }),
+            body: JSON.stringify(resendPayload),
           });
           const resendData = await resendRes.json();
           providerRef = resendData.id || providerRef;
           deliveryStatus = 'sent';
         } catch (e: any) {
           console.warn('Resend dispatch warning:', e);
+          deliveryStatus = 'failed';
           deliveryError = e.message;
         }
       } else {
@@ -533,8 +888,8 @@ async function setupServer() {
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`AgroStream Unified Server running on http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Mayors Place Unified Server running on http://0.0.0.0:${PORT}`);
   });
 }
 

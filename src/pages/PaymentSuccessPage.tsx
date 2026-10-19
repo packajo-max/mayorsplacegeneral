@@ -148,21 +148,31 @@ export const PaymentSuccessPage: React.FC<PaymentSuccessPageProps> = ({ navigate
             <div className="p-4 rounded-xl bg-[#F0F8F2] border-2 border-[#198754]/30 text-xs text-[#0d472b] space-y-1.5">
               <div className="font-bold text-[#146C43] flex items-center gap-1.5">
                 <PackageCheck className="w-4 h-4 text-[#198754]" />
-                Collection Pickup Address
+                Order Confirmed & Collection Pickup Address
               </div>
               <p>
-                Your seedlings will be prepared for collection at:{' '}
+                Your order payment has been verified. An SMS and email order confirmation have been dispatched. Your items will be prepared for collection at:{' '}
                 <strong className="text-[#146C43]">{settings.collectionAddress}</strong>.
+              </p>
+            </div>
+          ) : (verificationResult.requiresPDF && verificationResult.emailSent) ? (
+            <div className="p-4 rounded-xl bg-[#F0F8F2] border-2 border-[#198754]/30 text-xs text-[#0d472b] space-y-2">
+              <div className="font-bold text-[#146C43] flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-[#198754]" />
+                Schedule Confirmed & PDF Guide Dispatched
+              </div>
+              <p>
+                Your appointment slot is locked. An SMS confirmation and your prepared consultation advisory PDF guide have been dispatched to your provided contact details.
               </p>
             </div>
           ) : (
             <div className="p-4 rounded-xl bg-[#F0F8F2] border-2 border-[#198754]/30 text-xs text-[#0d472b] space-y-2">
               <div className="font-bold text-[#146C43] flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-[#198754]" />
-                Schedule Confirmed & Advisory PDF Sent
+                Appointment Schedule Confirmed
               </div>
               <p>
-                Your appointment slot is locked. An SMS confirmation and your prepared consultation advisory PDF guide have been dispatched to your provided contact details.
+                Your appointment slot is locked. An SMS booking confirmation has been dispatched to your phone number. Our team will contact you prior to your scheduled session.
               </p>
             </div>
           )}

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useBusiness } from '../context/BusinessContext';
 import { ServiceItem } from '../types';
 import { Currency, FeeDisclosureBadge } from '../components/Currency';
-import { downloadConsultationPdf } from '../lib/pdfGenerator';
 import {
   Clock,
   Calendar as CalendarIcon,
@@ -85,40 +84,8 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ navigate, se
     try {
       const bookingRef = `APT_${Date.now().toString().slice(-6)}`;
 
-      // 1. Dispatch automatic email with the consultation PDF details
-      try {
-        await fetch('/api/notifications/dispatch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'consultation_pdf_dispatch',
-            recipientPhone: customerPhone.trim(),
-            recipientEmail: customerEmail.trim(),
-            relatedReference: bookingRef,
-            message: `Your booking for "${selectedService.name}" has been received. Your prepared consultation advisory PDF pack for ${date} at ${selectedSlot} has been sent to your email.`,
-            channel: 'both',
-          }),
-        });
-      } catch (notifErr) {
-        console.warn('Could not dispatch automatic email:', notifErr);
-      }
-
-      // Also generate browser copy of the consultation advisory PDF
-      downloadConsultationPdf({
-        reference: bookingRef,
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        customerEmail: customerEmail.trim(),
-        serviceName: selectedService.name,
-        servicePrice: businessPrice,
-        platformFee,
-        totalAmount,
-        appointmentDate: date,
-        appointmentTime: selectedSlot,
-        notes: notes.trim(),
-      });
-
-      // 2. Initialize Paystack payment
+      // Initialize Paystack payment
+      const isConsultation = selectedService.name.toLowerCase().includes('consultation') || businessPrice === 25000;
       const res = await fetch('/api/paystack/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,6 +99,10 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ navigate, se
           metadata: {
             serviceId: selectedService.id,
             serviceName: selectedService.name,
+            product_name: selectedService.name,
+            product_price: businessPrice,
+            product_type: isConsultation ? 'consultation' : 'appointment',
+            requires_pdf: isConsultation,
             appointmentDate: date,
             appointmentTime: selectedSlot,
             notes: notes.trim(),

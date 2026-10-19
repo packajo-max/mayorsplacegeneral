@@ -73,6 +73,12 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ navigate }) => {
           customerPhone: customerPhone.trim(),
           customerEmail: customerEmail.trim() || undefined,
           businessAmount: subtotal,
+          metadata: {
+            product_name: orderItems.length > 0 ? orderItems.map((i) => i.name).join(', ') : 'Agricultural Shop Products',
+            product_price: subtotal,
+            product_type: 'agricultural_order',
+            requires_pdf: false,
+          },
           bookingData: {
             orderReference: orderRef,
             items: orderItems,
