@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useBusiness } from '../context/BusinessContext';
 import { LIVESTREAM_EVENT_TYPES, LIVESTREAM_PACKAGES } from '../lib/constants';
-import { Currency, FeeDisclosureBadge } from '../components/Currency';
+import { Currency } from '../components/Currency';
 import {
   Video,
   Radio,
@@ -447,15 +447,10 @@ export const LiveStreamPage: React.FC<LiveStreamPageProps> = ({ navigate }) => {
                     <span>Package Price:</span>
                     <Currency amount={selectedPackage.price} />
                   </div>
-                  <div className="flex justify-between text-[#0d472b]">
-                    <span>Platform Fee (Fixed):</span>
-                    <Currency amount={platformFee} />
-                  </div>
-                  <FeeDisclosureBadge feeNgn={platformFee} className="w-full justify-center" />
                   <div className="pt-2 border-t border-[#198754]/20 flex justify-between font-bold text-[#146C43] text-sm">
                     <span>Total Payable:</span>
                     <Currency
-                      amount={selectedPackage.price + platformFee}
+                      amount={selectedPackage.price}
                       className="text-[#198754] font-black text-base"
                     />
                   </div>

@@ -126,7 +126,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
             </ul>
             <div className="mt-4 pt-3 border-t border-[#198754]/60 text-[11px] text-[#F0F8F2]">
               <span className="font-bold text-white">Paystack Verified Checkout</span>
-              <div className="text-[10px] text-[#F0F8F2] mt-0.5">Fixed ₦60 platform fee applied per paid transaction.</div>
+              <div className="text-[10px] text-[#F0F8F2] mt-0.5">Secure electronic payments powered by Paystack.</div>
             </div>
           </div>
         </div>

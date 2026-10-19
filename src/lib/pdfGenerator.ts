@@ -197,12 +197,8 @@ export function downloadConsultationPdf(data: ConsultationPdfData) {
       <td class="value">₦${data.servicePrice.toLocaleString('en-NG')}</td>
     </tr>
     <tr>
-      <td class="label">Platform Transaction Fee</td>
-      <td class="value">₦${data.platformFee}</td>
-    </tr>
-    <tr>
-      <td class="label">Total Amount</td>
-      <td class="value"><strong>₦${data.totalAmount.toLocaleString('en-NG')}</strong></td>
+      <td class="label">Total Paid</td>
+      <td class="value"><strong>₦${data.servicePrice.toLocaleString('en-NG')}</strong></td>
     </tr>
     ${data.notes ? `
     <tr>

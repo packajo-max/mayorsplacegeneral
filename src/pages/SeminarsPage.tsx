@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useBusiness } from '../context/BusinessContext';
 import { Seminar } from '../types';
-import { Currency, FeeDisclosureBadge } from '../components/Currency';
+import { Currency } from '../components/Currency';
 import {
   Calendar,
   Clock,
@@ -274,15 +274,10 @@ export const SeminarsPage: React.FC<SeminarsPageProps> = ({ navigate, selectedSe
                     <span>Seminar Registration:</span>
                     <Currency amount={activeSeminarModal.registrationPrice} />
                   </div>
-                  <div className="flex justify-between text-[#0d472b]">
-                    <span>Platform Fee (Fixed):</span>
-                    <Currency amount={platformFee} />
-                  </div>
-                  <FeeDisclosureBadge feeNgn={platformFee} className="w-full justify-center" />
                   <div className="pt-2 border-t border-[#198754]/20 flex justify-between font-bold text-[#146C43] text-sm">
                     <span>Total Amount Payable:</span>
                     <Currency
-                      amount={activeSeminarModal.registrationPrice + platformFee}
+                      amount={activeSeminarModal.registrationPrice}
                       className="text-[#198754] font-black"
                     />
                   </div>

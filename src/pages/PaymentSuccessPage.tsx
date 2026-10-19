@@ -130,16 +130,14 @@ export const PaymentSuccessPage: React.FC<PaymentSuccessPageProps> = ({ navigate
               <span className="font-bold text-[#146C43]">{verificationResult.customerPhone}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-[#198754]/10">
-              <span className="text-[#0d472b]">Service Fee:</span>
+              <span className="text-[#0d472b]">
+                {verificationResult.category === 'appointment' ? 'Consultation Fee:' : 'Order Amount:'}
+              </span>
               <Currency amount={verificationResult.businessAmount} />
-            </div>
-            <div className="flex justify-between py-1 border-b border-[#198754]/10">
-              <span className="text-[#0d472b]">Platform Fee:</span>
-              <Currency amount={verificationResult.platformFee} />
             </div>
             <div className="flex justify-between py-2 border-b border-[#198754]/20 font-extrabold text-[#146C43] text-base">
               <span>Total Paid:</span>
-              <Currency amount={verificationResult.totalAmount} className="text-[#198754] text-lg font-black" />
+              <Currency amount={verificationResult.businessAmount} className="text-[#198754] text-lg font-black" />
             </div>
           </div>
 

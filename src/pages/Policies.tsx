@@ -20,7 +20,7 @@ export const PrivacyPolicyPage: React.FC<{ navigate: (path: string) => void }> =
         <section className="space-y-2">
           <h2 className="text-base font-bold text-[#146C43]">2. Financial Data & Payment Processing</h2>
           <p>
-            All electronic card and bank payments are processed securely through Paystack. We do not store or process debit card numbers, PINs, or CVV codes on our servers. Transactions include a disclosed fixed platform fee of ₦60.
+            All electronic card and bank payments are processed securely through Paystack. We do not store or process debit card numbers, PINs, or CVV codes on our servers.
           </p>
         </section>
         <section className="space-y-2">
@@ -56,9 +56,9 @@ export const TermsPage: React.FC<{ navigate: (path: string) => void }> = () => {
           </p>
         </section>
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-[#146C43]">3. Fixed Platform Fee & Settlement</h2>
+          <h2 className="text-base font-bold text-[#146C43]">3. Payment Settlement</h2>
           <p>
-            A non-negotiable fixed platform fee of ₦60 is charged per successful paid transaction on our portal. This fee is clearly itemized prior to payment authorization.
+            All bookings and orders are confirmed immediately upon authorized payment processing via Paystack.
           </p>
         </section>
       </div>
@@ -91,12 +91,6 @@ export const CancellationRefundPolicyPage: React.FC<{ navigate: (path: string) =
           <h2 className="text-base font-bold text-[#146C43]">3. Agricultural Seedlings Orders</h2>
           <p>
             Once seedlings have been tagged, bundled, and staged for pickup at the nursery, cancellation is not permitted due to perishable root hydration requirements. Unbatched orders may be refunded subject to management review.
-          </p>
-        </section>
-        <section className="space-y-2">
-          <h2 className="text-base font-bold text-[#146C43]">4. Platform Fee Refundability</h2>
-          <p>
-            In accordance with platform rules, the fixed ₦60 platform fee is retained by the platform provider to cover gateway transaction processing and is non-refundable upon cancellation.
           </p>
         </section>
       </div>

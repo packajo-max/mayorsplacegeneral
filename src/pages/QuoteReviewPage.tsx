@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Currency, FeeDisclosureBadge } from '../components/Currency';
+import { Currency } from '../components/Currency';
 import { useBusiness } from '../context/BusinessContext';
 import {
   FileText,
@@ -178,14 +178,9 @@ export const QuoteReviewPage: React.FC<QuoteReviewPageProps> = ({ navigate, quot
             <span>Production Quotation Fee:</span>
             <Currency amount={quotedPrice} />
           </div>
-          <div className="flex justify-between text-[#0d472b]">
-            <span>Platform Fee (Fixed):</span>
-            <Currency amount={platformFee} />
-          </div>
-          <FeeDisclosureBadge feeNgn={platformFee} className="w-full justify-center" />
           <div className="pt-3 border-t border-[#198754]/20 flex justify-between font-extrabold text-[#146C43] text-base sm:text-lg">
             <span>Total Payable:</span>
-            <Currency amount={totalPayable} className="text-[#198754] text-xl font-black" />
+            <Currency amount={quotedPrice} className="text-[#198754] text-xl font-black" />
           </div>
         </div>
 

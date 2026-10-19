@@ -109,7 +109,7 @@ export const PaymentTestCheckoutPage: React.FC<PaymentTestCheckoutPageProps> = (
           </div>
           <div className="text-right">
             <span className="text-xs text-[#0d472b] font-bold">Total Payable</span>
-            <Currency amount={totalAmount} className="text-[#198754] font-black text-base" />
+            <Currency amount={businessAmount || 25000} className="text-[#198754] font-black text-base" />
           </div>
         </div>
 

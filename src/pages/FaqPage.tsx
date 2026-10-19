@@ -10,8 +10,8 @@ export const FaqPage: React.FC<{ navigate: (path: string) => void }> = () => {
       a: 'No. At MAYORS PLACE GENERAL INVESTMENT LIMITED, customers never need to create an account or password. Simply select your service or seedlings, provide your name and phone number, and complete payment securely via Paystack. You can track your booking status securely anytime using an OTP sent to your phone.',
     },
     {
-      q: 'What is the ₦60 platform fee?',
-      a: 'A fixed platform fee of ₦60 is charged once per successful paid transaction. For an agricultural shopping cart with multiple products, the ₦60 fee applies only once per checkout, not per individual item.',
+      q: 'How are payments processed on the platform?',
+      a: 'All transactions are processed securely through Paystack with instant verification. We accept Nigerian debit cards, bank transfers, and USSD. You receive immediate confirmation via SMS and email.',
     },
     {
       q: 'How does seedling pickup and collection work?',

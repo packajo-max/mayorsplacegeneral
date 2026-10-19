@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ServiceItem } from '../types';
 import { useBusiness } from '../context/BusinessContext';
-import { Currency, FeeDisclosureBadge } from './Currency';
+import { Currency } from './Currency';
 import {
   X,
   Clock,
@@ -276,15 +276,10 @@ export const ConsultationBookingModal: React.FC<ConsultationBookingModalProps> =
               <span>Consultation Fee:</span>
               <Currency amount={businessPrice} className="font-bold text-[#146C43]" />
             </div>
-            <div className="flex justify-between text-[#0d472b]">
-              <span>Platform Processing Fee:</span>
-              <Currency amount={platformFee} />
-            </div>
-            <FeeDisclosureBadge feeNgn={platformFee} className="w-full justify-center" />
 
             <div className="pt-2 border-t border-[#198754]/20 flex justify-between items-center text-base font-extrabold text-[#146C43]">
               <span>Total Payable:</span>
-              <Currency amount={totalAmount} className="text-xl font-black text-[#198754]" />
+              <Currency amount={businessPrice} className="text-xl font-black text-[#198754]" />
             </div>
           </div>
 

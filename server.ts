@@ -445,7 +445,7 @@ app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) =
                 from: fromEmail,
                 to: customerEmailFromForm,
                 subject: `MAYORS PLACE — Consultation Guide & Confirmation (${reference})`,
-                text: `Dear ${payment.customerName || 'Valued Client'},\n\nAttached is your consultation guide.\n\nYour payment for ${payment.metadata?.product_name || 'Consultation'} (₦${Number(payment.businessAmount || 25000).toLocaleString()}) has been verified successfully.\nPayment Reference: ${reference}\nTotal Paid: ₦${Number(payment.totalAmountCharged).toLocaleString()} (incl. ₦60 platform fee)\n\nPlease review the attached ${filename} guide prior to your appointment.\n\nMayors Place General Investment Limited\nPlot 10 Commercial Avenue, Lagos, Nigeria\nTel: +234 803 123 4567 • Email: info@mayorsplace.ng`,
+                text: `Dear ${payment.customerName || 'Valued Client'},\n\nAttached is your consultation guide.\n\nYour payment for ${payment.metadata?.product_name || 'Consultation'} (₦${Number(payment.businessAmount || 25000).toLocaleString()}) has been verified successfully.\nPayment Reference: ${reference}\nTotal Paid: ₦${Number(payment.businessAmount || 25000).toLocaleString()}\n\nPlease review the attached ${filename} guide prior to your appointment.\n\nMayors Place General Investment Limited\nPlot 10 Commercial Avenue, Lagos, Nigeria\nTel: +234 803 123 4567 • Email: info@mayorsplace.ng`,
                 html: `
                   <div style="font-family: Arial, sans-serif; color: #0d472b; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #198754; border-radius: 12px; background: #ffffff;">
                     <div style="border-bottom: 3px solid #146C43; padding-bottom: 12px; margin-bottom: 20px;">
@@ -465,7 +465,7 @@ app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) =
                     <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
                       <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Payment Reference: ${reference}</p>
                       <p style="margin: 0 0 6px 0; font-size: 13px;">Customer Email: <strong>${customerEmailFromForm}</strong></p>
-                      <p style="margin: 0 0 6px 0; font-size: 13px;">Total Paid: ₦${Number(payment.totalAmountCharged).toLocaleString()} (incl. ₦60 platform fee)</p>
+                      <p style="margin: 0 0 6px 0; font-size: 13px;">Total Paid: <strong>₦${Number(payment.businessAmount || 25000).toLocaleString()}</strong></p>
                       <p style="margin: 0; font-size: 13px;">Your official consultation guide (<em>${filename}</em>) is attached to this email.</p>
                     </div>
 
@@ -564,7 +564,7 @@ app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) =
                       <p style="color: #198754; font-size: 13px; margin: 4px 0 0 0;">Order Payment Confirmation</p>
                     </div>
                     <p>Dear ${payment.customerName || 'Customer'},</p>
-                    <p>Your payment of <strong>₦${Number(payment.totalAmountCharged).toLocaleString()}</strong> has been successfully received.</p>
+                    <p>Your payment of <strong>₦${Number(payment.businessAmount || payment.totalAmountCharged).toLocaleString()}</strong> has been successfully received.</p>
                     <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
                       <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Order Reference: ${reference}</p>
                       <p style="margin: 0; font-size: 13px;">Collection Location: Plot 10 Commercial Avenue, Lagos, Nigeria.</p>
@@ -966,6 +966,7 @@ app.all('/api/test/consultation-email', async (req: Request, res: Response) => {
         <div style="background: #F0F8F2; border: 1px solid #198754; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <p style="margin: 0 0 6px 0; font-weight: bold; color: #146C43;">Payment Reference: ${testReference}</p>
           <p style="margin: 0 0 6px 0; font-size: 13px;">Customer Email: <strong>${targetEmail}</strong></p>
+          <p style="margin: 0 0 6px 0; font-size: 13px;">Total Paid: <strong>₦25,000</strong></p>
           <p style="margin: 0; font-size: 13px;">Your official consultation guide (<em>${filename}</em>) is attached to this email.</p>
         </div>
 
